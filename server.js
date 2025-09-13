@@ -48,7 +48,7 @@ app.post("/event", async (req, res) => {
     if (TEST_EVENT_CODE) payload.test_event_code = TEST_EVENT_CODE;
 
     const response = await fetch(
-      https://graph.facebook.com/${API_VERSION}/${PIXEL_ID}/events?access_token=${ACCESS_TOKEN},
+      `https://graph.facebook.com/${API_VERSION}/${PIXEL_ID}/events?access_token=${ACCESS_TOKEN}`,
       {
         method: "POST",
         body: JSON.stringify(payload),
@@ -65,4 +65,4 @@ app.post("/event", async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(🚀 API rodando na porta ${PORT}));
+app.listen(PORT, () => console.log(`🚀 API rodando na porta ${PORT}`));
