@@ -5,19 +5,31 @@ import crypto from "crypto";
 const app = express();
 app.use(express.json());
 
-// 🔑 SEUS DADOS DO PIXEL
-const PIXEL_ID = "1109960830695523";
-const ACCESS_TOKEN = "EAARMPjZBHlkMBPRSZBdbi3cetYj01eOGfUEFfducdSRBrB8txexmCO1rYUdoz6yBZC7SlR9xq6fnMxEIPrvZCQMAb3eD9zWMukaI6ZAmEJpsZA5oCFYrJKIqGtctKwAceFhFT5cAJkeEZCG3dpGKTyXUFxQwctrZBBa4hapLFf30TNR1wE2OKzsrXrX7iw7BNFLptwZDZD";
+// 🔑 Dados do Pixel via variáveis de ambiente
+const PIXEL_ID = process.env.PIXEL_ID;
+const ACCESS_TOKEN = process.env.ACCESS_TOKEN;
+const API_VERSION = process.env.API_VERSION || "v19.0";
+const TEST_EVENT_CODE = process.env.TEST_EVENT_CODE; // opcional
 
-// Função utilitária → hash exigido pelo Facebook
 function sha256(value) {
   return crypto.createHash("sha256").update(value).digest("hex");
 }
 
-// Endpoint principal
 app.post("/event", async (req, res) => {
   try {
-    const { event_name, event_id, event_source_url, user_data, custom_data } = req.body;
+    const { event_name, event_id, event_source_url, user, custom_data } = req.body;
+
+    // montar user_data com hash
+    const user_data = {};
+    if (user?.email) user_data.em = sha256(user.email.trim().toLowerCase());
+    if (user?.phone) user_data.ph = sha256(user.phone.replace(/\D/g, ""));
+    if (user?.fbp) user_data.fbp = user.fbp;
+    if (user?.fbc) user_data.fbc = user.fbc;
+
+    user_data.client_user_agent = req.headers["user-agent"] || "";
+    user_data.client_ip_address = req.headers["x-forwarded-for"]
+      ? req.headers["x-forwarded-for"].split(",")[0].trim()
+      : req.socket.remoteAddress;
 
     const payload = {
       data: [
@@ -30,12 +42,13 @@ app.post("/event", async (req, res) => {
           user_data,
           custom_data
         }
-      ],
-      test_event_code: "TEST8669" // ⚠️ Só para teste
+      ]
     };
 
+    if (TEST_EVENT_CODE) payload.test_event_code = TEST_EVENT_CODE;
+
     const response = await fetch(
-      `https://graph.facebook.com/v19.0/${PIXEL_ID}/events?access_token=${ACCESS_TOKEN}`,
+      https://graph.facebook.com/${API_VERSION}/${PIXEL_ID}/events?access_token=${ACCESS_TOKEN},
       {
         method: "POST",
         body: JSON.stringify(payload),
@@ -52,4 +65,4 @@ app.post("/event", async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 API rodando na porta ${PORT}`));
+app.listen(PORT, () => console.log(🚀 API rodando na porta ${PORT}));
