@@ -43,9 +43,12 @@ app.post("/event", async (req, res) => {
 
     // montar user_data com hash (conforme exigência do Meta)
     const user_data = {};
-    if (user.email) user_data.em = sha256(String(user.email).trim().toLowerCase());
-    if (user.phone) user_data.ph = sha256(String(user.phone).replace(/\D/g, ""));
-    if (user.name)  user_data.fn = sha256(String(user.name).trim().toLowerCase());
+    // user_data como arrays (recomendado pela Meta)
+    if (user.email) user_data.em = [ sha256(String(user.email).trim().toLowerCase()) ];
+    if (user.phone) user_data.ph = [ sha256(String(user.phone).replace(/\D/g, "")) ];
+    if (user.name) user_data.fn = [ sha256(String(user.name).trim().toLowerCase()) ];
+
+    // fbp/fbc NÃO devem ser hasheados aqui — envie como strings (se existirem)
     if (user.fbp) user_data.fbp = user.fbp;
     if (user.fbc) user_data.fbc = user.fbc;
 
