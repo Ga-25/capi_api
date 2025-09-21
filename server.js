@@ -62,7 +62,7 @@ app.post("/event", async (req, res) => {
         {
           event_name,
           event_time: Math.floor(Date.now() / 1000),
-          event_id: event_id || `srv_${Date.now()}`,
+          event_id: event_id,
           event_source_url,
           action_source: "website",
           user_data,
