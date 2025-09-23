@@ -5,7 +5,12 @@ import fetch from "node-fetch";
 import crypto from "crypto";
 
 const app = express();
-app.use(cors()); // em produção restrinja o origin
+app.use(cors({
+  origin: ["https://www.acesstream.com.br"], // libera só seu domínio
+  methods: ["GET", "POST", "OPTIONS"],
+  allowedHeaders: ["Content-Type"],
+  credentials: true
+}));
 app.use(express.json());
 
 // variáveis (defina no Render)
