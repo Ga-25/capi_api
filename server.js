@@ -19,6 +19,15 @@ app.use((req, res, next) => {
   next();
 });
 app.use(express.json());
+// Responde manualmente às requisições OPTIONS (preflight do CORS)
+app.options("/event", (req, res) => {
+  res.header("Access-Control-Allow-Origin", "https://www.acesstream.com.br");
+  res.header("Access-Control-Allow-Credentials", "true");
+  res.header("Access-Control-Allow-Headers", "Content-Type");
+  res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  return res.sendStatus(200);
+});
+
 
 // variáveis (defina no Render)
 const PIXEL_ID = process.env.PIXEL_ID;                      // primary
