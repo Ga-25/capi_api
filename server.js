@@ -11,6 +11,13 @@ app.use(cors({
   allowedHeaders: ["Content-Type"],
   credentials: true
 }));
+app.use((req, res, next) => {
+  res.header("Access-Control-Allow-Origin", "https://www.acesstream.com.br");
+  res.header("Access-Control-Allow-Credentials", "true");
+  res.header("Access-Control-Allow-Headers", "Content-Type");
+  res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+  next();
+});
 app.use(express.json());
 
 // variáveis (defina no Render)
