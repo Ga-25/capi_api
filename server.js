@@ -6,7 +6,7 @@ import crypto from "crypto";
 
 const app = express();
 app.use(cors({
-  origin: ["https://www.acesstream.com.br"], // libera só seu domínio
+  origin: "https://www.acesstream.com.br", // string, não array
   methods: ["GET", "POST", "OPTIONS"],
   allowedHeaders: ["Content-Type"],
   credentials: true
