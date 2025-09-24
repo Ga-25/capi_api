@@ -91,7 +91,11 @@ app.post("/event", async (req, res) => {
       : req.socket.remoteAddress;
 
     // garante um event_id único se não vier
-    const finalEventId = event_id || `srv_${Date.now()}_${Math.random().toString(36).slice(2,9)}`;
+    // use sempre o event_id vindo do client
+const finalEventId = event_id;
+if (!finalEventId) {
+  console.warn("⚠️ Evento recebido sem event_id — risco de deduplicação incorreta");
+}
 
     const payload = {
       data: [
