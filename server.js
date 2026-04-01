@@ -1,92 +1,376 @@
-// server.js (ESM) - cole e rode no Render
+// server.js (ESM) - FURION POWER CAPI
 import express from "express";
 import cors from "cors";
 import fetch from "node-fetch";
 import crypto from "crypto";
 
+
+
 const app = express();
-app.use(cors()); // em produção restrinja o origin
-app.use(express.json());
 
-// variáveis (defina no Render)
-const PIXEL_ID = process.env.PIXEL_ID;                      // primary
-const ACCESS_TOKEN = process.env.ACCESS_TOKEN;              // primary token
-const BACKUP_PIXEL_ID = process.env.BACKUP_PIXEL_ID || "";  // opcional
-const BACKUP_ACCESS_TOKEN = process.env.BACKUP_ACCESS_TOKEN || ""; // opcional
+
+
+// FURION POWER - Enhanced CORS
+app.use(cors({
+  origin: ['https://acesstream.com.br'], // Configure seus domínios
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true
+}));
+
+
+
+app.use(express.json({ limit: '10mb' }));
+
+
+
+// FURION POWER - Environment Variables
+const PIXEL_ID = process.env.PIXEL_ID || '1265874438298153'; // seu pixel
+const ACCESS_TOKEN = process.env.ACCESS_TOKEN; // obrigatório
+
+
+
 const API_VERSION = process.env.API_VERSION || "v19.0";
-const TEST_EVENT_CODE = process.env.TEST_EVENT_CODE || null; // opcional
+const TEST_EVENT_CODE = process.env.TEST_EVENT_CODE || null;
 
+
+
+// FURION POWER - Enhanced SHA256 with validation
 function sha256(value = "") {
-  return crypto.createHash("sha256").update(value).digest("hex");
-}
-
-async function sendToPixel(pixelId, token, payload) {
-  if (!pixelId || !token) return { skipped: true, reason: "missing_pixel_or_token" };
-  const url = `https://graph.facebook.com/${API_VERSION}/${pixelId}/events?access_token=${token}`;
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload)
-  });
-  const json = await resp.json();
-  return json;
-}
-
-app.post("/event", async (req, res) => {
+  if (!value || typeof value !== 'string') return '';
   try {
-    const { event_name = "CustomEvent", event_id, event_source_url = "", user = {}, custom_data = {} } = req.body;
+    return crypto.createHash("sha256")
+      .update(value.toLowerCase().trim())
+      .digest("hex");
+  } catch (error) {
+    console.error('SHA256 Error:', error);
+    return '';
+  }
+}
 
-    // NÃO envie PageView do servidor por padrão (evita alerta de "PageView não desduplicado")
-    if (event_name && event_name.toLowerCase() === "pageview") {
-      return res.json({ ok: true, skipped: "server_pageview_skipped" });
+
+
+// FURION POWER - Multi-pixel sender with retry logic
+async function sendToPixel(payload, retryCount = 0) {
+  if (!PIXEL_ID || !ACCESS_TOKEN) {
+    return { error: true, message: "Pixel ou token não configurado" };
+  }
+
+  const url = `https://graph.facebook.com/${API_VERSION}/${PIXEL_ID}/events?access_token=${ACCESS_TOKEN}`;
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10000);
+
+  try {
+    const response = await fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeout);
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${JSON.stringify(result)}`);
     }
 
-    // montar user_data com hash (conforme exigência do Meta)
+    return {
+      success: true,
+      events_received: result.events_received || 0,
+      fbtrace_id: result.fbtrace_id || null
+    };
+
+  } catch (error) {
+    console.error("Erro no envio:", error.message);
+
+    if (retryCount < 2) {
+      await new Promise(r => setTimeout(r, 1000));
+      return sendToPixel(payload, retryCount + 1);
+    }
+
+    return {
+      error: true,
+      message: error.message
+    };
+  }
+}
+
+
+
+// FURION POWER - Main event handler
+app.post("/event", async (req, res) => {
+  const startTime = Date.now();
+  
+  try {
+    const { 
+      event_name = "CustomEvent", 
+      event_id, 
+      event_source_url = "", 
+      user = {}, 
+      custom_data = {} 
+    } = req.body;
+
+
+
+    // FURION POWER - Skip server-side PageView to avoid duplication
+    if (event_name && event_name.toLowerCase() === "pageview") {
+      return res.json({ 
+        ok: true, 
+        skipped: "server_pageview_avoided",
+        message: "PageView events should be client-side only"
+      });
+    }
+
+
+
+    // FURION POWER - Enhanced user data processing
     const user_data = {};
-    if (user.email) user_data.em = sha256(String(user.email).trim().toLowerCase());
-    if (user.phone) user_data.ph = sha256(String(user.phone).replace(/\D/g, ""));
-    if (user.name)  user_data.fn = sha256(String(user.name).trim().toLowerCase());
+    
+    // Hash PII data
+    if (user.email) {
+      const cleanEmail = String(user.email).trim().toLowerCase();
+      user_data.em = sha256(cleanEmail);
+    }
+    
+    if (user.phone) {
+    let cleanPhone = String(user.phone).replace(/\D/g, "");
+
+    if (cleanPhone.length === 11 && !cleanPhone.startsWith('55')) {
+    cleanPhone = '55' + cleanPhone;
+    }
+
+    user_data.ph = sha256(cleanPhone);
+    }
+    
+    if (user.name) {
+    const cleanName = String(user.name).trim().toLowerCase();
+    const nameParts = cleanName.split(' ');
+    
+    user_data.fn = sha256(nameParts[0]);
+
+    if (nameParts.length > 1) {
+        user_data.ln = sha256(nameParts.slice(1).join(' '));
+    }
+    }
+
+    if (user.external_id) {
+    user_data.external_id = sha256(user.external_id);
+    }
+
+
+
+    // Add browser fingerprinting data
     if (user.fbp) user_data.fbp = user.fbp;
     if (user.fbc) user_data.fbc = user.fbc;
 
+
+
+    // FURION POWER - Enhanced client data
     user_data.client_user_agent = req.headers["user-agent"] || "";
     user_data.client_ip_address = req.headers["x-forwarded-for"]
       ? req.headers["x-forwarded-for"].split(",")[0].trim()
-      : req.socket.remoteAddress;
+      : req.headers["x-real-ip"] || req.socket.remoteAddress;
 
-    const payload = {
-      data: [
-        {
-          event_name,
-          event_time: Math.floor(Date.now() / 1000),
-          event_id: event_id || `srv_${Date.now()}`,
-          event_source_url,
-          action_source: "website",
-          user_data,
-          custom_data
+
+
+    // FURION POWER - Event payload construction
+    const eventPayload = {
+      data: [{
+        event_name,
+        event_time: req.body.event_time || Math.floor(Date.now() / 1000),
+        event_id: event_id || `srv_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+        event_source_url,
+        action_source: "website",
+        user_data,
+        custom_data: {
+          ...custom_data,
+          server_event: true,
+          capi_version: "furion_v3",
+          processing_time: Date.now() - startTime
         }
-      ]
+      }]
     };
 
-    if (TEST_EVENT_CODE) payload.test_event_code = TEST_EVENT_CODE;
 
-    // envia para pixel primário
-    const primaryResp = await sendToPixel(PIXEL_ID, ACCESS_TOKEN, payload);
 
-    // envia para pixel backup (opcional)
-    let backupResp = null;
-    if (BACKUP_PIXEL_ID && BACKUP_ACCESS_TOKEN) {
-      backupResp = await sendToPixel(BACKUP_PIXEL_ID, BACKUP_ACCESS_TOKEN, payload);
+    // Add test event code if provided
+    if (TEST_EVENT_CODE) {
+      eventPayload.test_event_code = TEST_EVENT_CODE;
     }
 
-    // resposta para debug
-    return res.json({ ok: true, primary: primaryResp, backup: backupResp });
-  } catch (err) {
-    console.error("Erro CAPI:", err);
-    return res.status(500).json({ error: "Erro ao enviar evento para CAPI", details: String(err) });
+
+
+    // FURION POWER - Send to all pixels concurrently
+    const result = await sendToPixel(eventPayload);
+
+    const totalTime = Date.now() - startTime;
+
+    console.log(`📡 CAPI: ${event_name} | ${result.success ? 'SUCCESS' : 'ERROR'} | ${totalTime}ms`);
+
+    return res.json({
+    ok: true,
+    event_name,
+    event_id: eventPayload.data[0].event_id,
+    success: result.success || false,
+    fbtrace_id: result.fbtrace_id || null,
+    error: result.error || null
+    });
+
+
+
+    } catch (error) {
+        console.error("FURION CAPI Error:", error);
+        
+        return res.status(500).json({
+        ok: false,
+        error: "Internal server error",
+        message: error.message,
+        event_name: req.body.event_name || "unknown",
+        timestamp: new Date().toISOString(),
+        processing_time_ms: Date.now() - startTime
+        });
+    }
+    });
+
+
+
+// FURION POWER - Health check endpoint
+app.get("/health", (req, res) => {
+  const configured = !!ACCESS_TOKEN;
+  
+  res.json({
+  status: "healthy",
+  pixel_configured: configured,
+  api_version: API_VERSION,
+  test_mode: !!TEST_EVENT_CODE,
+  timestamp: new Date().toISOString()
+  });
+});
+
+
+
+// FURION POWER - Pixel configuration endpoint
+app.get("/pixels", (req, res) => {
+  res.json({
+    pixel_id: PIXEL_ID,
+    configured: !!ACCESS_TOKEN,
+    masked_token: ACCESS_TOKEN ? ACCESS_TOKEN.substring(0, 8) + "..." : null
+  });
+});
+
+
+
+// FURION POWER - Test endpoint
+app.post("/test", async (req, res) => {
+  try {
+    const testPayload = {
+      data: [{
+        event_name: "Test",
+        event_time: Math.floor(Date.now() / 1000),
+        event_id: `test_${Date.now()}`,
+        action_source: "website",
+        user_data: {
+          em: sha256("test@teste.com")
+        }
+      }]
+    };
+
+    if (TEST_EVENT_CODE) {
+      testPayload.test_event_code = TEST_EVENT_CODE;
+    }
+
+    const result = await sendToPixel(testPayload);
+
+    res.json({
+      test: true,
+      success: result.success || false,
+      response: result
+    });
+
+  } catch (error) {
+    res.status(500).json({
+      error: error.message
+    });
   }
 });
 
-app.get("/", (req, res) => res.send("CAPI running"));
+
+
+// FURION POWER - Analytics endpoint
+app.get("/analytics", (req, res) => {
+  // This could be expanded to include more detailed analytics
+  res.json({
+    service: "FURION POWER CAPI Analytics",
+    message: "Analytics endpoint - implement based on your needs",
+    available_endpoints: [
+      "GET /health - Service health check",
+      "GET /pixels - Pixel configuration info", 
+      "POST /test - Test all configured pixels",
+      "POST /event - Send events to pixels",
+      "GET /analytics - This endpoint"
+    ]
+  });
+});
+
+
+
+// FURION POWER - Error handling middleware
+app.use((err, req, res, next) => {
+  console.error('FURION CAPI Unhandled Error:', err);
+  
+  res.status(500).json({
+    ok: false,
+    error: "Internal server error",
+    message: "An unexpected error occurred",
+    timestamp: new Date().toISOString()
+  });
+});
+
+
+
+// FURION POWER - 404 handler
+app.use((req, res) => {
+  res.status(404).json({
+    ok: false,
+    error: "Endpoint not found",
+    message: `${req.method} ${req.path} is not available`,
+    available_endpoints: ["/event", "/health", "/pixels", "/test", "/analytics"]
+  });
+});
+
+
+
+// FURION POWER - Server startup
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 API rodando na porta ${PORT}`));
+
+
+
+app.listen(PORT, () => {
+  console.log(`🔥 FURION POWER CAPI Server running on port ${PORT}`);
+  console.log(`📡 Pixel configurado: ${ACCESS_TOKEN ? 'SIM' : 'NÃO'}`);
+  console.log(`⚡ API Version: ${API_VERSION}`);
+  console.log(`🧪 Test mode: ${TEST_EVENT_CODE ? 'ENABLED' : 'DISABLED'}`);
+  console.log(`🚀 Ready to dominate conversions!`);
+});
+
+
+
+// FURION POWER - Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('🔥 FURION CAPI: Received SIGTERM, shutting down gracefully');
+  process.exit(0);
+});
+
+
+
+process.on('SIGINT', () => {
+  console.log('🔥 FURION CAPI: Received SIGINT, shutting down gracefully');  
+  process.exit(0);
+});
+
+
+
+export default app;
