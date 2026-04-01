@@ -12,7 +12,10 @@ const app = express();
 
 // FURION POWER - Enhanced CORS
 app.use(cors({
-  origin: ['https://acesstream.com.br'], // Configure seus domínios
+  origin: [
+    'https://acesstream.com.br',
+    'https://www.acesstream.com.br'
+  ],
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
