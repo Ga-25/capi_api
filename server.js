@@ -38,17 +38,24 @@ const TEST_EVENT_CODE = process.env.TEST_EVENT_CODE || null;
 
 
 
-// FURION POWER - Enhanced SHA256 with validation
+// ✅ FURION POWER - SHA256 MELHORADO
 function sha256(value = "") {
-  if (!value || typeof value !== 'string') return '';
-  try {
-    return crypto.createHash("sha256")
-      .update(value.toLowerCase().trim())
-      .digest("hex");
-  } catch (error) {
-    console.error('SHA256 Error:', error);
-    return '';
-  }
+    if (!value || typeof value !== 'string') return '';
+    try {
+        // Normalização avançada
+        const normalizedValue = String(value)
+            .trim()
+            .toLowerCase()
+            .replace(/\s+/g, ' ') // Múltiplos espaços → espaço único
+            .replace(/\s+$/, ''); // Remove espaços finais
+            
+        return crypto.createHash("sha256")
+            .update(normalizedValue)
+            .digest("hex");
+    } catch (error) {
+        console.error('SHA256 Error:', error);
+        return '';
+    }
 }
 
 
@@ -130,52 +137,110 @@ app.post("/event", async (req, res) => {
 
 
     // FURION POWER - Enhanced user data processing
-    const user_data = {};
-    
-    // Hash PII data
-    if (user.email) {
-      const cleanEmail = String(user.email).trim().toLowerCase();
-      user_data.em = sha256(cleanEmail);
-    }
-    
-    if (user.phone) {
-    let cleanPhone = String(user.phone).replace(/\D/g, "");
-
-    if (cleanPhone.length === 11 && !cleanPhone.startsWith('55')) {
-    cleanPhone = '55' + cleanPhone;
-    }
-
-    user_data.ph = sha256(cleanPhone);
-    }
-    
-    if (user.name) {
-    const cleanName = String(user.name).trim().toLowerCase();
-    const nameParts = cleanName.split(' ');
-    
-    user_data.fn = sha256(nameParts[0]);
-
-    if (nameParts.length > 1) {
-        user_data.ln = sha256(nameParts.slice(1).join(' '));
-    }
-    }
-
-    if (user.external_id) {
-    user_data.external_id = sha256(user.external_id);
-    }
+    // ✅ FURION POWER - PROCESSAMENTO MELHORADO DE DADOS
+        const user_data = {};
 
 
 
-    // Add browser fingerprinting data
-    if (user.fbp) user_data.fbp = user.fbp;
-    if (user.fbc) user_data.fbc = user.fbc;
+        // ✅ EMAIL - Normalização avançada + hash
+        if (user.email) {
+            const cleanEmail = String(user.email)
+                .trim()
+                .toLowerCase()
+                .replace(/\s+/g, '') // Remove todos os espaços
+                .replace(/\.+/g, '.') // Múltiplos pontos → ponto único
+                .replace(/\+.*@/, '@'); // Remove alias do Gmail (user+alias@gmail.com)
+            
+            user_data.em = sha256(cleanEmail);
+            console.log('✅ Email processado:', cleanEmail.substring(0, 3) + '***');
+        }
 
 
 
-    // FURION POWER - Enhanced client data
-    user_data.client_user_agent = req.headers["user-agent"] || "";
-    user_data.client_ip_address = req.headers["x-forwarded-for"]
-      ? req.headers["x-forwarded-for"].split(",")[0].trim()
-      : req.headers["x-real-ip"] || req.socket.remoteAddress;
+        // ✅ TELEFONE - Normalização brasileira + hash
+        if (user.phone) {
+            let cleanPhone = String(user.phone)
+                .replace(/\D/g, '') // Apenas números
+                .replace(/^0+/, ''); // Remove zeros iniciais
+            
+            // Adicionar código do país se necessário
+            if (cleanPhone.length === 11 && !cleanPhone.startsWith('55')) {
+                cleanPhone = '55' + cleanPhone;
+            }
+            
+            // Validar se tem tamanho correto
+            if (cleanPhone.length >= 12 && cleanPhone.length <= 15) {
+                user_data.ph = sha256(cleanPhone);
+                console.log('✅ Telefone processado:', cleanPhone.substring(0, 4) + '***');
+            }
+        }
+
+
+
+        // ✅ NOME - Normalização + hash
+        if (user.name) {
+            const cleanName = String(user.name)
+                .trim()
+                .toLowerCase()
+                .replace(/\s+/g, ' ') // Múltiplos espaços → espaço único
+                .replace(/[^\p{L}\s]/gu, ''); // Remove caracteres especiais, mantém acentos
+            
+            const nameParts = cleanName.split(' ').filter(part => part.length > 1);
+            
+            if (nameParts.length > 0) {
+                user_data.fn = sha256(nameParts[0]); // Primeiro nome
+                console.log('✅ Primeiro nome processado:', nameParts[0].substring(0, 2) + '***');
+                
+                if (nameParts.length > 1) {
+                    user_data.ln = sha256(nameParts.slice(1).join(' ')); // Sobrenomes
+                    console.log('✅ Sobrenome processado');
+                }
+            }
+        }
+
+
+
+        // ✅ EXTERNAL_ID - Combinação única + hash
+        if (user.external_id) {
+            const cleanExternalId = String(user.external_id)
+                .trim()
+                .toLowerCase()
+                .replace(/\s+/g, '');
+            
+            user_data.external_id = sha256(cleanExternalId);
+            console.log('✅ External ID processado:', cleanExternalId.substring(0, 5) + '***');
+        }
+
+
+
+        // ✅ BROWSER FINGERPRINTING (não hasheados)
+        if (user.fbp) {
+            user_data.fbp = String(user.fbp).trim();
+            console.log('✅ FBP capturado:', user.fbp.substring(0, 10) + '***');
+        }
+        
+        if (user.fbc) {
+            user_data.fbc = String(user.fbc).trim();
+            console.log('✅ FBC capturado:', user.fbc.substring(0, 10) + '***');
+        }
+
+
+
+    // ✅ FURION POWER - CLIENT DATA MELHORADO
+        user_data.client_user_agent = req.headers["user-agent"] || "";
+        
+        // IP mais preciso
+        user_data.client_ip_address = 
+            req.headers["cf-connecting-ip"] || // Cloudflare
+            req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || // Proxy
+            req.headers["x-real-ip"] || // Nginx
+            req.connection?.remoteAddress || // Fallback
+            req.socket?.remoteAddress || // Fallback
+            "unknown";
+
+
+
+        console.log('✅ Client IP capturado:', user_data.client_ip_address);
 
 
 
@@ -211,7 +276,23 @@ app.post("/event", async (req, res) => {
 
     const totalTime = Date.now() - startTime;
 
-    console.log(`📡 CAPI: ${event_name} | ${result.success ? 'SUCCESS' : 'ERROR'} | ${totalTime}ms`);
+    
+        console.log(`📡 CAPI: ${event_name} | ${result.success ? 'SUCCESS' : 'ERROR'} | ${totalTime}ms`);
+        
+        // ✅ FURION POWER - LOG DETALHADO
+        if (result.success) {
+            console.log(`✅ Event ID: ${eventPayload.data[0].event_id}`);
+            console.log(`✅ Events Received: ${result.events_received || 0}`);
+            console.log(`✅ FB Trace: ${result.fbtrace_id || 'N/A'}`);
+            
+            // Log de dados processados (sem PII)
+            const processedFields = Object.keys(user_data).filter(key => 
+                !['client_ip_address', 'client_user_agent'].includes(key)
+            );
+            console.log(`✅ Campos processados: ${processedFields.join(', ')}`);
+        } else {
+            console.error(`❌ CAPI Error: ${result.message}`);
+        }
 
     return res.json({
     ok: true,
