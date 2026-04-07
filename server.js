@@ -59,6 +59,165 @@ function sha256(value = "") {
 }
 
 
+// ✅ FURION POWER - FUNÇÕES DE ENRICHMENT AVANÇADO
+
+
+
+function detectPhoneRegion(areaCode) {
+    const regionMap = {
+        '11': 'SP_Capital', '12': 'SP_Interior', '13': 'SP_Litoral', '14': 'SP_Interior',
+        '15': 'SP_Interior', '16': 'SP_Interior', '17': 'SP_Interior', '18': 'SP_Interior', '19': 'SP_Interior',
+        '21': 'RJ_Capital', '22': 'RJ_Interior', '24': 'RJ_Interior',
+        '27': 'ES', '28': 'ES',
+        '31': 'MG_Capital', '32': 'MG_Interior', '33': 'MG_Interior', '34': 'MG_Interior', '35': 'MG_Interior', '37': 'MG_Interior', '38': 'MG_Interior',
+        '41': 'PR_Capital', '42': 'PR_Interior', '43': 'PR_Interior', '44': 'PR_Interior', '45': 'PR_Interior', '46': 'PR_Interior',
+        '47': 'SC_Norte', '48': 'SC_Capital', '49': 'SC_Oeste',
+        '51': 'RS_Capital', '53': 'RS_Interior', '54': 'RS_Interior', '55': 'RS_Interior',
+        '61': 'DF', '62': 'GO', '64': 'GO',
+        '65': 'MT', '66': 'MT', '67': 'MS',
+        '68': 'AC', '69': 'RO',
+        '71': 'BA_Capital', '73': 'BA_Interior', '74': 'BA_Interior', '75': 'BA_Interior', '77': 'BA_Interior',
+        '79': 'SE', '81': 'PE_Capital', '87': 'PE_Interior',
+        '82': 'AL', '83': 'PB', '84': 'RN', '85': 'CE', '86': 'PI', '87': 'PE', '88': 'CE', '89': 'PI',
+        '91': 'PA_Capital', '93': 'PA_Interior', '94': 'PA_Interior',
+        '95': 'RR', '96': 'AP', '97': 'AM', '98': 'MA', '99': 'MA'
+    };
+    return regionMap[areaCode] || 'Unknown';
+}
+
+
+
+function analyzeUserAgent(userAgent) {
+    const ua = userAgent.toLowerCase();
+    
+    // Device Type
+    let device_type = 'desktop';
+    if (/mobile|android|iphone|ipad|tablet/.test(ua)) {
+        device_type = /ipad|tablet/.test(ua) ? 'tablet' : 'mobile';
+    }
+    
+    // Browser
+    let browser = 'unknown';
+    if (ua.includes('chrome')) browser = 'chrome';
+    else if (ua.includes('firefox')) browser = 'firefox';
+    else if (ua.includes('safari')) browser = 'safari';
+    else if (ua.includes('edge')) browser = 'edge';
+    else if (ua.includes('opera')) browser = 'opera';
+    
+    // OS
+    let os = 'unknown';
+    if (ua.includes('windows')) os = 'windows';
+    else if (ua.includes('mac')) os = 'macos';
+    else if (ua.includes('linux')) os = 'linux';
+    else if (ua.includes('android')) os = 'android';
+    else if (ua.includes('ios') || ua.includes('iphone') || ua.includes('ipad')) os = 'ios';
+    
+    return { device_type, browser, os };
+}
+
+
+
+// ✅ ENHANCED PAYLOAD CONSTRUCTION
+function enhanceEventPayload(eventPayload, user_data, custom_data, startTime) {
+    // Adicionar dados de qualidade
+    const qualityScore = calculateDataQuality(user_data);
+    
+    eventPayload.data[0].custom_data = {
+        ...custom_data,
+        server_event: true,
+        capi_version: "furion_v4_enhanced",
+        processing_time: Date.now() - startTime,
+        data_quality_score: qualityScore,
+        enrichment_level: 'premium',
+        matching_confidence: calculateMatchingConfidence(user_data),
+        user_value_score: calculateUserValueScore(user_data, custom_data)
+    };
+    
+    return eventPayload;
+}
+
+
+
+function calculateDataQuality(user_data) {
+    let score = 0;
+    let maxScore = 0;
+    
+    // Email quality
+    if (user_data.em) {
+        score += user_data.email_quality === 'premium' ? 25 : 15;
+    }
+    maxScore += 25;
+    
+    // Phone quality
+    if (user_data.ph) {
+        score += user_data.phone_quality === 'mobile' ? 25 : 15;
+    }
+    maxScore += 25;
+    
+    // Name quality
+    if (user_data.fn) {
+        score += user_data.name_quality === 'complete' ? 20 : 10;
+    }
+    maxScore += 20;
+    
+    // External ID quality
+    if (user_data.external_id) {
+        score += user_data.external_id_quality === 'high' ? 15 : 10;
+    }
+    maxScore += 15;
+    
+    // Browser fingerprinting
+    if (user_data.fbp) score += 10;
+    if (user_data.fbc) score += 5;
+    maxScore += 15;
+    
+    return Math.round((score / maxScore) * 100);
+}
+
+
+
+function calculateMatchingConfidence(user_data) {
+    let confidence = 0;
+    
+    // High-quality identifiers
+    if (user_data.em && user_data.email_quality === 'premium') confidence += 30;
+    else if (user_data.em) confidence += 20;
+    
+    if (user_data.ph && user_data.phone_quality === 'mobile') confidence += 25;
+    else if (user_data.ph) confidence += 15;
+    
+    if (user_data.external_id && user_data.external_id_quality === 'high') confidence += 20;
+    else if (user_data.external_id) confidence += 10;
+    
+    // Browser fingerprinting boost
+    if (user_data.fbp) confidence += 15;
+    if (user_data.fbc) confidence += 10;
+    
+    return Math.min(confidence, 100);
+}
+
+
+
+function calculateUserValueScore(user_data, custom_data) {
+    let score = 50; // Base score
+    
+    // Data completeness bonus
+    if (user_data.em) score += 10;
+    if (user_data.ph) score += 10;
+    if (user_data.fn && user_data.ln) score += 10;
+    if (user_data.external_id) score += 5;
+    
+    // Quality bonuses
+    if (user_data.email_quality === 'premium') score += 10;
+    if (user_data.phone_quality === 'mobile') score += 5;
+    if (user_data.name_quality === 'complete') score += 5;
+    
+    // Conversion value bonus
+    if (custom_data.value && custom_data.value >= 25) score += 15;
+    
+    return Math.min(score, 100);
+}
+
 
 // FURION POWER - Multi-pixel sender with retry logic
 async function sendToPixel(payload, retryCount = 0) {
@@ -138,135 +297,174 @@ app.post("/event", async (req, res) => {
 
     // FURION POWER - Enhanced user data processing
     // ✅ FURION POWER - PROCESSAMENTO MELHORADO DE DADOS
-        const user_data = {};
+    // ✅ FURION POWER - PROCESSAMENTO MELHORADO DE DADOS + ENRICHMENT
+    const user_data = {};
 
+    
 
+    // ✅ EMAIL - Normalização avançada + hash
+    if (user.email) {
+        const cleanEmail = String(user.email)
+            .trim()
+            .toLowerCase()
+            .replace(/\s+/g, '') // Remove todos os espaços
+            .replace(/\.+/g, '.') // Múltiplos pontos → ponto único
+            .replace(/\+.*@/, '@'); // Remove alias do Gmail (user+alias@gmail.com)
+        
+        user_data.em = sha256(cleanEmail);
+        console.log('✅ Email processado:', cleanEmail.substring(0, 3) + '***');
+        
+        // ✅ ENRICHMENT: Detectar domínio premium
+        const domain = cleanEmail.split('@')[1];
+        const premiumDomains = ['gmail.com', 'hotmail.com', 'outlook.com', 'yahoo.com', 'icloud.com'];
+        user_data.email_quality = premiumDomains.includes(domain) ? 'premium' : 'standard';
+    }
 
-        // ✅ EMAIL - Normalização avançada + hash
-        if (user.email) {
-            const cleanEmail = String(user.email)
-                .trim()
-                .toLowerCase()
-                .replace(/\s+/g, '') // Remove todos os espaços
-                .replace(/\.+/g, '.') // Múltiplos pontos → ponto único
-                .replace(/\+.*@/, '@'); // Remove alias do Gmail (user+alias@gmail.com)
-            
-            user_data.em = sha256(cleanEmail);
-            console.log('✅ Email processado:', cleanEmail.substring(0, 3) + '***');
-        }
+    
 
-
-
-        // ✅ TELEFONE - Normalização brasileira + hash
-        if (user.phone) {
-            let cleanPhone = String(user.phone)
-                .replace(/\D/g, '') // Apenas números
-                .replace(/^0+/, ''); // Remove zeros iniciais
-            
-            // Adicionar código do país se necessário
-            if (cleanPhone.length === 11 && !cleanPhone.startsWith('55')) {
-                cleanPhone = '55' + cleanPhone;
-            }
-            
-            // Validar se tem tamanho correto
-            if (cleanPhone.length >= 12 && cleanPhone.length <= 15) {
-                user_data.ph = sha256(cleanPhone);
-                console.log('✅ Telefone processado:', cleanPhone.substring(0, 4) + '***');
-            }
-        }
-
-
-
-        // ✅ NOME - Normalização + hash
-        if (user.name) {
-            const cleanName = String(user.name)
-                .trim()
-                .toLowerCase()
-                .replace(/\s+/g, ' ') // Múltiplos espaços → espaço único
-                .replace(/[^\p{L}\s]/gu, ''); // Remove caracteres especiais, mantém acentos
-            
-            const nameParts = cleanName.split(' ').filter(part => part.length > 1);
-            
-            if (nameParts.length > 0) {
-                user_data.fn = sha256(nameParts[0]); // Primeiro nome
-                console.log('✅ Primeiro nome processado:', nameParts[0].substring(0, 2) + '***');
-                
-                if (nameParts.length > 1) {
-                    user_data.ln = sha256(nameParts.slice(1).join(' ')); // Sobrenomes
-                    console.log('✅ Sobrenome processado');
-                }
-            }
-        }
-
-
-
-        // ✅ EXTERNAL_ID - Combinação única + hash
-        if (user.external_id) {
-            const cleanExternalId = String(user.external_id)
-                .trim()
-                .toLowerCase()
-                .replace(/\s+/g, '');
-            
-            user_data.external_id = sha256(cleanExternalId);
-            console.log('✅ External ID processado:', cleanExternalId.substring(0, 5) + '***');
-        }
-
-
-
-        // ✅ BROWSER FINGERPRINTING (não hasheados)
-        if (user.fbp) {
-            user_data.fbp = String(user.fbp).trim();
-            console.log('✅ FBP capturado:', user.fbp.substring(0, 10) + '***');
+    // ✅ TELEFONE - Normalização brasileira + hash + validação
+    if (user.phone) {
+        let cleanPhone = String(user.phone)
+            .replace(/\D/g, '') // Apenas números
+            .replace(/^0+/, ''); // Remove zeros iniciais
+        
+        // Adicionar código do país se necessário
+        if (cleanPhone.length === 11 && !cleanPhone.startsWith('55')) {
+            cleanPhone = '55' + cleanPhone;
         }
         
-        if (user.fbc) {
-            user_data.fbc = String(user.fbc).trim();
-            console.log('✅ FBC capturado:', user.fbc.substring(0, 10) + '***');
+        // Validar se tem tamanho correto
+        if (cleanPhone.length >= 12 && cleanPhone.length <= 15) {
+            user_data.ph = sha256(cleanPhone);
+            console.log('✅ Telefone processado:', cleanPhone.substring(0, 4) + '***');
+            
+            // ✅ ENRICHMENT: Detectar operadora e região
+            const areaCode = cleanPhone.substring(2, 4);
+            user_data.phone_region = detectPhoneRegion(areaCode);
+            user_data.phone_quality = cleanPhone.length === 13 ? 'mobile' : 'landline';
         }
+    }
 
+    
 
-
-    // ✅ FURION POWER - CLIENT DATA MELHORADO
-        user_data.client_user_agent = req.headers["user-agent"] || "";
+    // ✅ NOME - Normalização + hash + enrichment
+    if (user.name) {
+        const cleanName = String(user.name)
+            .trim()
+            .toLowerCase()
+            .replace(/\s+/g, ' ') // Múltiplos espaços → espaço único
+            .replace(/[^\p{L}\s]/gu, ''); // Remove caracteres especiais, mantém acentos
         
-        // IP mais preciso
-        user_data.client_ip_address = 
-            req.headers["cf-connecting-ip"] || // Cloudflare
-            req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || // Proxy
-            req.headers["x-real-ip"] || // Nginx
-            req.connection?.remoteAddress || // Fallback
-            req.socket?.remoteAddress || // Fallback
-            "unknown";
+        const nameParts = cleanName.split(' ').filter(part => part.length > 1);
+        
+        if (nameParts.length > 0) {
+            user_data.fn = sha256(nameParts[0]); // Primeiro nome
+            console.log('✅ Primeiro nome processado:', nameParts[0].substring(0, 2) + '***');
+            
+            if (nameParts.length > 1) {
+                user_data.ln = sha256(nameParts.slice(1).join(' ')); // Sobrenomes
+                console.log('✅ Sobrenome processado');
+            }
+            
+            // ✅ ENRICHMENT: Qualidade do nome
+            user_data.name_quality = nameParts.length >= 2 ? 'complete' : 'partial';
+            user_data.name_length = nameParts.length;
+        }
+    }
 
+    
 
+    // ✅ EXTERNAL_ID - Combinação única + hash + enrichment
+    if (user.external_id) {
+        const cleanExternalId = String(user.external_id)
+            .trim()
+            .toLowerCase()
+            .replace(/\s+/g, '');
+        
+        user_data.external_id = sha256(cleanExternalId);
+        console.log('✅ External ID processado:', cleanExternalId.substring(0, 5) + '***');
+        
+        // ✅ ENRICHMENT: Qualidade do external_id
+        user_data.external_id_quality = cleanExternalId.length > 20 ? 'high' : 'standard';
+    }
 
-        console.log('✅ Client IP capturado:', user_data.client_ip_address);
+    
+
+    // ✅ BROWSER FINGERPRINTING (não hasheados) + enrichment
+    if (user.fbp) {
+        user_data.fbp = String(user.fbp).trim();
+        console.log('✅ FBP capturado:', user.fbp.substring(0, 10) + '***');
+    }
+
+    
+
+    if (user.fbc) {
+        user_data.fbc = String(user.fbc).trim();
+        console.log('✅ FBC capturado:', user.fbc.substring(0, 10) + '***');
+    }
+
+    
+
+    // ✅ FURION POWER - CLIENT DATA MELHORADO + ENRICHMENT
+    user_data.client_user_agent = req.headers["user-agent"] || "";
+
+    
+
+    // IP mais preciso + geolocation enrichment
+    user_data.client_ip_address = 
+        req.headers["cf-connecting-ip"] || // Cloudflare
+        req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || // Proxy
+        req.headers["x-real-ip"] || // Nginx
+        req.connection?.remoteAddress || // Fallback
+        req.socket?.remoteAddress || // Fallback
+        "unknown";
+
+    
+
+    console.log('✅ Client IP capturado:', user_data.client_ip_address);
+
+    
+
+    // ✅ ENRICHMENT AVANÇADO: Device & Browser Analysis
+    if (user_data.client_user_agent) {
+        const deviceInfo = analyzeUserAgent(user_data.client_user_agent);
+        user_data.device_type = deviceInfo.device_type;
+        user_data.browser_name = deviceInfo.browser;
+        user_data.os_name = deviceInfo.os;
+        console.log('✅ Device info:', deviceInfo);
+    }
 
 
 
     // FURION POWER - Event payload construction
-    const eventPayload = {
-      data: [{
-        event_name,
-        event_time: req.body.event_time || Math.floor(Date.now() / 1000),
-        event_id: event_id || `srv_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-        event_source_url,
-        action_source: "website",
-        user_data,
-        custom_data: {
-          ...custom_data,
-          server_event: true,
-          capi_version: "furion_v3",
-          processing_time: Date.now() - startTime
-        }
-      }]
+    // ✅ FURION POWER - ENHANCED EVENT PAYLOAD CONSTRUCTION
+    let eventPayload = {
+        data: [{
+            event_name,
+            event_time: req.body.event_time || Math.floor(Date.now() / 1000),
+            event_id: event_id || `srv_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
+            event_source_url,
+            action_source: "website",
+            user_data,
+            custom_data: {
+                ...custom_data,
+                server_event: true,
+                capi_version: "furion_v4_enhanced",
+                processing_time: Date.now() - startTime
+            }
+        }]
     };
 
+  
 
+    // ✅ APPLY ADVANCED ENRICHMENT
+    eventPayload = enhanceEventPayload(eventPayload, user_data, custom_data, startTime);
+
+  
 
     // Add test event code if provided
     if (TEST_EVENT_CODE) {
-      eventPayload.test_event_code = TEST_EVENT_CODE;
+        eventPayload.test_event_code = TEST_EVENT_CODE;
     }
 
 
