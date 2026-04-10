@@ -322,23 +322,43 @@ app.post("/event", async (req, res) => {
    
 
     // ✅ TELEFONE - Normalização + hash (APENAS HASH NO USER_DATA)
+    // ✅ TELEFONE - VALIDAÇÃO MELHORADA E MAIS FLEXÍVEL
     if (user.phone) {
         let cleanPhone = String(user.phone)
-            .replace(/\D/g, '')
-            .replace(/^0+/, '');
+            .replace(/\D/g, '') // Remove todos os caracteres não numéricos
+            .replace(/^0+/, ''); // Remove zeros iniciais
+        
+        console.log('📱 Telefone original recebido:', user.phone);
+        console.log('📱 Telefone limpo inicial:', cleanPhone);
+        
+        // ✅ NORMALIZAÇÃO BRASILEIRA MELHORADA
+        if (cleanPhone.length === 10) {
+            // Telefone fixo (11) 9999-9999 -> adiciona 9
+            cleanPhone = cleanPhone.substring(0, 2) + '9' + cleanPhone.substring(2);
+        }
         
         if (cleanPhone.length === 11 && !cleanPhone.startsWith('55')) {
             cleanPhone = '55' + cleanPhone;
         }
         
-        if (cleanPhone.length >= 12 && cleanPhone.length <= 15) {
+        // ✅ VALIDAÇÃO MAIS FLEXÍVEL
+        if (cleanPhone.length >= 11) { // ✅ ACEITA MAIS FORMATOS
+            // Garantir que tenha pelo menos código do país
+            if (!cleanPhone.startsWith('55') && cleanPhone.length === 11) {
+                cleanPhone = '55' + cleanPhone;
+            }
+            
             user_data.ph = sha256(cleanPhone);
-            console.log('✅ Telefone processado:', cleanPhone.substring(0, 4) + '***');
+            console.log('✅ Telefone processado FINAL:', cleanPhone.substring(0, 4) + '***');
+            console.log('✅ Hash do telefone gerado:', user_data.ph ? 'SUCCESS' : 'FAILED');
             
             // ✅ ENRICHMENT SEPARADO
-            const areaCode = cleanPhone.substring(2, 4);
+            const areaCode = cleanPhone.length >= 4 ? cleanPhone.substring(2, 4) : '11';
             enrichment_data.phone_region = detectPhoneRegion(areaCode);
             enrichment_data.phone_quality = cleanPhone.length === 13 ? 'mobile' : 'landline';
+            enrichment_data.phone_length = cleanPhone.length;
+        } else {
+            console.warn('⚠️ Telefone muito curto, ignorado:', cleanPhone);
         }
     }
 
@@ -632,6 +652,9 @@ app.listen(PORT, () => {
   console.log(`⚡ API Version: ${API_VERSION}`);
   console.log(`🧪 Test mode: ${TEST_EVENT_CODE ? 'ENABLED' : 'DISABLED'}`);
   console.log(`🚀 Ready to dominate conversions!`);
+  console.log('=== FURION PHONE DEBUG ===');
+  console.log('📱 Dados recebidos do front:', JSON.stringify(user, null, 2));
+  console.log('========================');
 });
 
 
