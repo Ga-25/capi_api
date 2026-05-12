@@ -29,11 +29,15 @@ app.use(express.json({ limit: '10mb' }));
 
 // FURION POWER - Environment Variables
 const PIXEL_ID = process.env.PIXEL_ID || '2435493903541379'; // seu pixel
-const ACCESS_TOKEN = process.env.ACCESS_TOKEN; // obrigatório
+const ACCESS_TOKEN = process.env.ACCESS_TOKEN;
+if (!ACCESS_TOKEN) {
+  console.error("ACCESS_TOKEN não configurado.");
+  process.exit(1);
+} // obrigatório
 
 
 
-const API_VERSION = process.env.API_VERSION || "v19.0";
+const API_VERSION = process.env.API_VERSION || "v22.0";
 const TEST_EVENT_CODE = process.env.TEST_EVENT_CODE || null;
 
 
@@ -63,159 +67,6 @@ function sha256(value = "") {
 
 
 
-function detectPhoneRegion(areaCode) {
-    const regionMap = {
-        '11': 'SP_Capital', '12': 'SP_Interior', '13': 'SP_Litoral', '14': 'SP_Interior',
-        '15': 'SP_Interior', '16': 'SP_Interior', '17': 'SP_Interior', '18': 'SP_Interior', '19': 'SP_Interior',
-        '21': 'RJ_Capital', '22': 'RJ_Interior', '24': 'RJ_Interior',
-        '27': 'ES', '28': 'ES',
-        '31': 'MG_Capital', '32': 'MG_Interior', '33': 'MG_Interior', '34': 'MG_Interior', '35': 'MG_Interior', '37': 'MG_Interior', '38': 'MG_Interior',
-        '41': 'PR_Capital', '42': 'PR_Interior', '43': 'PR_Interior', '44': 'PR_Interior', '45': 'PR_Interior', '46': 'PR_Interior',
-        '47': 'SC_Norte', '48': 'SC_Capital', '49': 'SC_Oeste',
-        '51': 'RS_Capital', '53': 'RS_Interior', '54': 'RS_Interior', '55': 'RS_Interior',
-        '61': 'DF', '62': 'GO', '64': 'GO',
-        '65': 'MT', '66': 'MT', '67': 'MS',
-        '68': 'AC', '69': 'RO',
-        '71': 'BA_Capital', '73': 'BA_Interior', '74': 'BA_Interior', '75': 'BA_Interior', '77': 'BA_Interior',
-        '79': 'SE', '81': 'PE_Capital', '87': 'PE_Interior',
-        '82': 'AL', '83': 'PB', '84': 'RN', '85': 'CE', '86': 'PI', '87': 'PE', '88': 'CE', '89': 'PI',
-        '91': 'PA_Capital', '93': 'PA_Interior', '94': 'PA_Interior',
-        '95': 'RR', '96': 'AP', '97': 'AM', '98': 'MA', '99': 'MA'
-    };
-    return regionMap[areaCode] || 'Unknown';
-}
-
-
-
-function analyzeUserAgent(userAgent) {
-    const ua = userAgent.toLowerCase();
-    
-    // Device Type
-    let device_type = 'desktop';
-    if (/mobile|android|iphone|ipad|tablet/.test(ua)) {
-        device_type = /ipad|tablet/.test(ua) ? 'tablet' : 'mobile';
-    }
-    
-    // Browser
-    let browser = 'unknown';
-    if (ua.includes('chrome')) browser = 'chrome';
-    else if (ua.includes('firefox')) browser = 'firefox';
-    else if (ua.includes('safari')) browser = 'safari';
-    else if (ua.includes('edge')) browser = 'edge';
-    else if (ua.includes('opera')) browser = 'opera';
-    
-    // OS
-    let os = 'unknown';
-    if (ua.includes('windows')) os = 'windows';
-    else if (ua.includes('mac')) os = 'macos';
-    else if (ua.includes('linux')) os = 'linux';
-    else if (ua.includes('android')) os = 'android';
-    else if (ua.includes('ios') || ua.includes('iphone') || ua.includes('ipad')) os = 'ios';
-    
-    return { device_type, browser, os };
-}
-
-
-
-// ✅ ENHANCED PAYLOAD CONSTRUCTION
-function enhanceEventPayload(eventPayload, user_data, enrichment_data, custom_data, startTime) {
-    // Calcular qualidade com enrichment separado
-    const qualityScore = calculateDataQuality(user_data, enrichment_data);
-    
-    eventPayload.data[0].custom_data = {
-        ...custom_data,
-        server_event: true,
-        capi_version: "furion_v4_enhanced",
-        processing_time: Date.now() - startTime,
-        data_quality_score: qualityScore,
-        enrichment_level: 'premium',
-        matching_confidence: calculateMatchingConfidence(user_data, enrichment_data),
-        user_value_score: calculateUserValueScore(user_data, enrichment_data, custom_data),
-        // ✅ ENRICHMENT NO CUSTOM_DATA (PERMITIDO)
-        ...enrichment_data
-    };
-    
-    return eventPayload;
-}
-
-
-
-function calculateDataQuality(user_data, enrichment_data) {
-    let score = 0;
-    let maxScore = 0;
-    
-    // Email quality
-    if (user_data.em) {
-        score += enrichment_data.email_quality === 'premium' ? 25 : 15;
-    }
-    maxScore += 25;
-    
-    // Phone quality
-    if (user_data.ph) {
-        score += enrichment_data.phone_quality === 'mobile' ? 25 : 15;
-    }
-    maxScore += 25;
-    
-    // Name quality
-    if (user_data.fn) {
-        score += enrichment_data.name_quality === 'complete' ? 20 : 10;
-    }
-    maxScore += 20;
-    
-    // External ID quality
-    if (user_data.external_id) {
-        score += enrichment_data.external_id_quality === 'high' ? 15 : 10;
-    }
-    maxScore += 15;
-    
-    // Browser fingerprinting
-    if (user_data.fbp) score += 10;
-    if (user_data.fbc) score += 5;
-    maxScore += 15;
-    
-    return Math.round((score / maxScore) * 100);
-}
-
-
-
-function calculateMatchingConfidence(user_data, enrichment_data) {
-    let confidence = 0;
-    
-    if (user_data.em && enrichment_data.email_quality === 'premium') confidence += 30;
-    else if (user_data.em) confidence += 20;
-    
-    if (user_data.ph && enrichment_data.phone_quality === 'mobile') confidence += 25;
-    else if (user_data.ph) confidence += 15;
-    
-    if (user_data.external_id && enrichment_data.external_id_quality === 'high') confidence += 20;
-    else if (user_data.external_id) confidence += 10;
-    
-    if (user_data.fbp) confidence += 15;
-    if (user_data.fbc) confidence += 10;
-    
-    return Math.min(confidence, 100);
-}
-
-
-
-function calculateUserValueScore(user_data, enrichment_data, custom_data) {
-    let score = 50;
-    
-    if (user_data.em) score += 10;
-    if (user_data.ph) score += 10;
-    if (user_data.fn && user_data.ln) score += 10;
-    if (user_data.external_id) score += 5;
-    
-    if (enrichment_data.email_quality === 'premium') score += 10;
-    if (enrichment_data.phone_quality === 'mobile') score += 5;
-    if (enrichment_data.name_quality === 'complete') score += 5;
-    
-    if (custom_data.value && custom_data.value >= 25) score += 15;
-    
-    return Math.min(score, 100);
-}
-
-
 // FURION POWER - Multi-pixel sender with retry logic
 async function sendToPixel(payload, retryCount = 0) {
   if (!PIXEL_ID || !ACCESS_TOKEN) {
@@ -225,14 +76,14 @@ async function sendToPixel(payload, retryCount = 0) {
   const url = `https://graph.facebook.com/${API_VERSION}/${PIXEL_ID}/events?access_token=${ACCESS_TOKEN}`;
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10000);
+  const timeout = setTimeout(() => controller.abort(), 15000);
 
   try {
     const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
-      signal: controller.signal
+      signal: controller.signal,
     });
 
     clearTimeout(timeout);
@@ -264,7 +115,65 @@ async function sendToPixel(payload, retryCount = 0) {
   }
 }
 
+function detectPhoneRegion(areaCode = '') {
+  const regions = {
+    '11': 'SP',
+    '21': 'RJ',
+    '27': 'ES',
+    '31': 'MG',
+    '41': 'PR',
+    '47': 'SC',
+    '51': 'RS',
+    '61': 'DF',
+    '62': 'GO',
+    '71': 'BA',
+    '77': 'BA',
+    '85': 'CE'
+  };
 
+  return regions[areaCode] || 'unknown';
+}
+
+function analyzeUserAgent(ua = '') {
+  ua = ua.toLowerCase();
+
+  let browser = 'unknown';
+  let os = 'unknown';
+  let device_type = 'desktop';
+
+  if (ua.includes('chrome')) browser = 'chrome';
+  else if (ua.includes('firefox')) browser = 'firefox';
+  else if (ua.includes('safari')) browser = 'safari';
+
+  if (ua.includes('windows')) os = 'windows';
+
+  if (ua.includes('android')) {
+    os = 'android';
+    device_type = 'mobile';
+  }
+
+  if (ua.includes('iphone')) {
+    os = 'ios';
+    device_type = 'mobile';
+  }
+
+  return {
+    browser,
+    os,
+    device_type
+  };
+}
+
+function enhanceEventPayload(payload, user_data, enrichment_data, custom_data, startTime) {
+  payload.data[0].custom_data = {
+    ...payload.data[0].custom_data,
+    enrichment_data,
+    processing_time_ms: Date.now() - startTime,
+    match_quality: Object.keys(user_data).length
+  };
+
+  return payload;
+}
 
 // FURION POWER - Main event handler
 app.post("/event", async (req, res) => {
@@ -297,8 +206,7 @@ app.post("/event", async (req, res) => {
     // ✅ FURION POWER - PROCESSAMENTO MELHORADO DE DADOS + ENRICHMENT
     // ✅ FURION POWER - PROCESSAMENTO CORRIGIDO (SEM ENRICHMENT NO USER_DATA)
     const user_data = {};
-    const enrichment_data = {}; // ✅ SEPARAR ENRICHMENT
-
+    const enrichment_data = {};
    
 
     // ✅ EMAIL - Normalização + hash (APENAS HASH NO USER_DATA)
@@ -464,9 +372,7 @@ app.post("/event", async (req, res) => {
             user_data,
             custom_data: {
                 ...custom_data,
-                server_event: true,
-                capi_version: "furion_v4_enhanced",
-                processing_time: Date.now() - startTime
+                server_event: true
             }
         }]
     };
@@ -527,8 +433,7 @@ app.post("/event", async (req, res) => {
         error: "Internal server error",
         message: error.message,
         event_name: req.body.event_name || "unknown",
-        timestamp: new Date().toISOString(),
-        processing_time_ms: Date.now() - startTime
+        timestamp: new Date().toISOString()
         });
     }
     });
