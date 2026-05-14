@@ -8,7 +8,7 @@ import crypto from "crypto";
 
 const app = express();
 
-
+app.set('trust proxy', 1);
 
 // FURION POWER - Enhanced CORS
 app.use(cors({
@@ -18,12 +18,16 @@ app.use(cors({
   ],
   methods: ['GET', 'POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
-  credentials: true
+  credentials: true,
+  optionsSuccessStatus: 200
 }));
 
 
 
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({
+  limit: '10mb',
+  strict: true
+}));
 
 
 
@@ -76,12 +80,15 @@ async function sendToPixel(payload, retryCount = 0) {
   const url = `https://graph.facebook.com/${API_VERSION}/${PIXEL_ID}/events?access_token=${ACCESS_TOKEN}`;
 
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 15000);
+  const timeout = setTimeout(() => controller.abort(), 10000);
 
   try {
     const response = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+  "Content-Type": "application/json",
+  "Connection": "keep-alive"
+},
       body: JSON.stringify(payload),
       signal: controller.signal,
     });
@@ -250,7 +257,7 @@ app.post("/event", async (req, res) => {
         }
         
         // ✅ VALIDAÇÃO MAIS FLEXÍVEL
-        if (cleanPhone.length >= 11) { // ✅ ACEITA MAIS FORMATOS
+        if (cleanPhone.length >= 12 && cleanPhone.length <= 13){ // ✅ ACEITA MAIS FORMATOS
             // Garantir que tenha pelo menos código do país
             if (!cleanPhone.startsWith('55') && cleanPhone.length === 11) {
                 cleanPhone = '55' + cleanPhone;
@@ -367,7 +374,7 @@ app.post("/event", async (req, res) => {
             event_name,
             event_time: req.body.event_time || Math.floor(Date.now() / 1000),
             event_id: event_id || `srv_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
-            event_source_url,
+            event_source_url: event_source_url || 'https://acesstream.com.br',
             action_source: "website",
             user_data,
             custom_data: {
