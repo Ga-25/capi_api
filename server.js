@@ -32,7 +32,7 @@ app.use(express.json({
 
 
 // FURION POWER - Environment Variables
-const PIXEL_ID = process.env.PIXEL_ID || '4132313290395473'; // seu pixel
+const PIXEL_ID = process.env.PIXEL_ID || '2135914040299804'; // seu pixel
 const ACCESS_TOKEN = process.env.ACCESS_TOKEN;
 if (!ACCESS_TOKEN) {
   console.error("ACCESS_TOKEN não configurado.");
